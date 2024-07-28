@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Polling App</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Polling App</h1>
+        <div id="create-poll">
+            <h2>Create Poll</h2>
+            <form id="poll-form">
+                <input type="text" id="question" placeholder="Poll Question" required>
+                <input type="text" id="option1" placeholder="Option 1" required>
+                <input type="text" id="option2" placeholder="Option 2" required>
+                <button type="submit">Create Poll</button>
+            </form>
+        </div>
+        <div id="polls">
+            <h2>Polls</h2>
+        </div>
+    </div>
+    <script>
+        const loadPolls = async () => {
+            const response = await fetch('/polls');
+            const polls = await response.json();
+            const pollsDiv = document.getElementById('polls');
+            pollsDiv.innerHTML = '';
+
+            polls.forEach(poll => {
+                const pollDiv = document.createElement('div');
+                pollDiv.className = 'poll';
+
+                pollDiv.innerHTML = `
+                    <h3>${poll.question}</h3>
+                    <button onclick="vote(${poll.id}, 'option1')">${poll.option1} (${poll.votes1})</button>
+                    <button onclick="vote(${poll.id}, 'option2')">${poll.option2} (${poll.votes2})</button>
+                    <button class="delete-button" onclick="deletePoll(${poll.id})">Delete Poll</button>
+                `;
+
+                pollsDiv.appendChild(pollDiv);
+            });
+        };
+
+        const vote = async (pollId, option) => {
+            await fetch('/vote', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pollId, option })
+            });
+        };
+
+        const createPoll = async (event) => {
+            event.preventDefault();
+            const question = document.getElementById('question').value;
+            const option1 = document.getElementById('option1').value;
+            const option2 = document.getElementById('option2').value;
+
+            await fetch('/polls', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ question, option1, option2 })
+            });
+
+            document.getElementById('poll-form').reset();
+            document.getElementById('create-poll').style.display = 'none'; // Sembunyikan form setelah membuat polling
+            loadPolls();
+        };
+
+        const deletePoll = async (pollId) => {
+            await fetch(`/polls/${pollId}`, {
+                method: 'DELETE',
+            });
+            loadPolls();
+        };
+
+        const checkPollVisibility = async () => {
+            const response = await fetch('/poll-visibility');
+            const { pollCreated } = await response.json();
+            if (pollCreated) {
+                document.getElementById('create-poll').style.display = 'none';
+            }
+        };
+
+        document.getElementById('poll-form').addEventListener('submit', createPoll);
+
+        const ws = new WebSocket(`ws://${location.host}`);
+        ws.onmessage = (event) => {
+            loadPolls();
+        };
+
+        checkPollVisibility();
+        loadPolls();
+    </script>
+</body>
+</html>
